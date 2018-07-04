@@ -1,6 +1,4 @@
-import os, sys, shutil, struct, simplejson
-import numpy as np
-import matplotlib.pyplot as plt
+import shutil, struct, simplejson
 from scipy.spatial import distance
 from pylab import *
 import ntpath
@@ -55,7 +53,7 @@ def textListToColors(names):
     # STEP C: mapping of 1-dimensional values to colors in a jet-colormap
     textToColor = pca.transform(Dnames)
     textToColor = 255 * (textToColor - textToColor.min()) / (textToColor.max() - textToColor.min())
-    textmaps = generateColorMap();
+    textmaps = generateColorMap()
     colors = [textmaps[int(c)] for c in textToColor]
     return colors
 
@@ -68,7 +66,7 @@ def textListToColorsSimple(names):
     textToColor = [ uNames.index(n) for n in names ]
     textToColor = np.array(textToColor)
     textToColor = 255 * (textToColor - textToColor.min()) / (textToColor.max() - textToColor.min())
-    textmaps = generateColorMap();
+    textmaps = generateColorMap()
     colors = [textmaps[int(c)] for c in textToColor]
     
     # colors = [c for (n, c) in sorted(zip(names, colors))]
@@ -97,7 +95,7 @@ def chordialDiagram(fileStr, SM, Threshold, names, namesCategories):
  
     jsonSMMatrix = simplejson.dumps(SM2.tolist())
     f = open(jsonPath,'w'); f.write(jsonSMMatrix);  f.close()
-    f = open(namesPath,'w'); f.write("name,color\n"); 
+    f = open(namesPath,'w'); f.write("name,color\n")
     for i, n in enumerate(names):
         f.write("{0:s},{1:s}\n".format(n,"#"+colors[i]))
     f.close()
@@ -116,11 +114,11 @@ def visualizeFeaturesFolder(folder, dimReductionMethod, priorKnowledge = "none")
     if dimReductionMethod=="pca":
         allMtFeatures, wavFilesList = aF.dirWavFeatureExtraction(folder, 30.0, 30.0, 0.050, 0.050, computeBEAT = True)
         if allMtFeatures.shape[0]==0:
-            print "Error: No data found! Check input folder"
+            print("Error: No data found! Check input folder")
             return
         
-        namesCategoryToVisualize = [ntpath.basename(w).replace('.wav','').split(" --- ")[0] for w in wavFilesList]; 
-        namesToVisualize       = [ntpath.basename(w).replace('.wav','') for w in wavFilesList]; 
+        namesCategoryToVisualize = [ntpath.basename(w).replace('.wav','').split(" --- ")[0] for w in wavFilesList]
+        namesToVisualize = [ntpath.basename(w).replace('.wav','') for w in wavFilesList]
 
         (F, MEAN, STD) = aT.normalizeFeatures([allMtFeatures])
         F = np.concatenate(F)
@@ -142,11 +140,11 @@ def visualizeFeaturesFolder(folder, dimReductionMethod, priorKnowledge = "none")
     else:    
         allMtFeatures, Ys, wavFilesList = aF.dirWavFeatureExtractionNoAveraging(folder, 20.0, 5.0, 0.040, 0.040) # long-term statistics cannot be applied in this context (LDA needs mid-term features)
         if allMtFeatures.shape[0]==0:
-            print "Error: No data found! Check input folder"
+            print("Error: No data found! Check input folder")
             return
         
-        namesCategoryToVisualize = [ntpath.basename(w).replace('.wav','').split(" --- ")[0] for w in wavFilesList]; 
-        namesToVisualize       = [ntpath.basename(w).replace('.wav','') for w in wavFilesList]; 
+        namesCategoryToVisualize = [ntpath.basename(w).replace('.wav','').split(" --- ")[0] for w in wavFilesList]
+        namesToVisualize       = [ntpath.basename(w).replace('.wav','') for w in wavFilesList]
 
         ldaLabels = Ys
         if priorKnowledge=="artist":
@@ -190,14 +188,14 @@ def visualizeFeaturesFolder(folder, dimReductionMethod, priorKnowledge = "none")
 
     SM = 1.0 - distance.squareform(distance.pdist(finalDims2, 'cosine'))
     for i in range(SM.shape[0]):
-        SM[i,i] = 0.0;
+        SM[i,i] = 0.0
 
 
     chordialDiagram("visualization", SM, 0.50, namesToVisualize, namesCategoryToVisualize)
 
     SM = 1.0 - distance.squareform(distance.pdist(F, 'cosine'))
     for i in range(SM.shape[0]):
-        SM[i,i] = 0.0;
+        SM[i,i] = 0.0
     chordialDiagram("visualizationInitial", SM, 0.50, namesToVisualize, namesCategoryToVisualize)
 
     # plot super-categories (i.e. artistname
@@ -210,7 +208,7 @@ def visualizeFeaturesFolder(folder, dimReductionMethod, priorKnowledge = "none")
 
     SMgroup = 1.0 - distance.squareform(distance.pdist(finalDimsGroup, 'cosine'))
     for i in range(SMgroup.shape[0]):
-        SMgroup[i,i] = 0.0;
+        SMgroup[i,i] = 0.0
     chordialDiagram("visualizationGroup", SMgroup, 0.50, uNamesCategoryToVisualize, uNamesCategoryToVisualize)
 
 

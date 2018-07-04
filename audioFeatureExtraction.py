@@ -1,27 +1,14 @@
-import sys
 import time
 import os
 import glob
 import numpy
-import cPickle
-import aifc
 import math
-from numpy import NaN, Inf, arange, isscalar, array
-from scipy.fftpack import rfft
 from scipy.fftpack import fft
 from scipy.fftpack.realtransforms import dct
-from scipy.signal import fftconvolve
-from matplotlib.mlab import find
 import matplotlib.pyplot as plt
-from scipy import linalg as la
-import audioTrainTest as aT
 import audioBasicIO
 import utilities
-from scipy.signal import lfilter, hamming
-#from scikits.talkbox import lpc
-
-reload(sys)  
-sys.setdefaultencoding('utf8')
+from scipy.signal import lfilter
 
 eps = 0.00000001
 
@@ -37,21 +24,20 @@ def stZCR(frame):
 
 def stEnergy(frame):
     """Computes signal energy of frame"""
-    return numpy.sum(frame ** 2) / numpy.float64(len(frame))
+    return numpy.sum(numpy.power(frame, 2)) / numpy.float64(len(frame))
 
 
 def stEnergyEntropy(frame, numOfShortBlocks=10):
     """Computes entropy of energy"""
-    Eol = numpy.sum(frame ** 2)    # total frame energy
+    Eol = numpy.sum(numpy.power(frame, 2))    # total frame energy
     L = len(frame)
     subWinLength = int(numpy.floor(L / numOfShortBlocks))
     if L != subWinLength * numOfShortBlocks:
             frame = frame[0:subWinLength * numOfShortBlocks]
     # subWindows is of size [numOfShortBlocks x L]
     subWindows = frame.reshape(subWinLength, numOfShortBlocks, order='F').copy()
-
     # Compute normalized sub-frame energies:
-    s = numpy.sum(subWindows ** 2, axis=0) / (Eol + eps)
+    s = numpy.sum(numpy.power(subWindows, 2), axis=0) / (Eol + eps)
 
     # Compute entropy of the normalized sub-frame energies:
     Entropy = -numpy.sum(s * numpy.log2(s + eps))
@@ -86,14 +72,14 @@ def stSpectralCentroidAndSpread(X, fs):
 def stSpectralEntropy(X, numOfShortBlocks=10):
     """Computes the spectral entropy"""
     L = len(X)                         # number of frame samples
-    Eol = numpy.sum(X ** 2)            # total spectral energy
+    Eol = numpy.sum(numpy.power(X, 2))            # total spectral energy
 
     subWinLength = int(numpy.floor(L / numOfShortBlocks))   # length of sub-frame
     if L != subWinLength * numOfShortBlocks:
         X = X[0:subWinLength * numOfShortBlocks]
 
     subWindows = X.reshape(subWinLength, numOfShortBlocks, order='F').copy()  # define sub-frames (using matrix reshape)
-    s = numpy.sum(subWindows ** 2, axis=0) / (Eol + eps)                      # compute spectral sub-energies
+    s = numpy.sum(numpy.power(subWindows, 2), axis=0) / (Eol + eps)                      # compute spectral sub-energies
     En = -numpy.sum(s*numpy.log2(s + eps))                                    # compute spectral entropy
 
     return En
@@ -107,8 +93,8 @@ def stSpectralFlux(X, Xprev):
         Xpre:        the abs(fft) of the previous frame
     """
     # compute the spectral flux as the sum of square distances:
-    sumX = numpy.sum(X + eps)
-    sumPrevX = numpy.sum(Xprev + eps)
+    sumX = numpy.sum(numpy.add(X, eps))
+    sumPrevX = numpy.sum(numpy.add(Xprev, eps))
     F = numpy.sum((X / sumX - Xprev/sumPrevX) ** 2)
 
     return F
@@ -116,14 +102,14 @@ def stSpectralFlux(X, Xprev):
 
 def stSpectralRollOff(X, c, fs):
     """Computes spectral roll-off"""
-    totalEnergy = numpy.sum(X ** 2)
+    totalEnergy = numpy.sum(numpy.power(X, 2))
     fftLength = len(X)
     Thres = c*totalEnergy
     # Ffind the spectral rolloff as the frequency position where the respective spectral energy is equal to c*totalEnergy
-    CumSum = numpy.cumsum(X ** 2) + eps
+    CumSum = numpy.cumsum(numpy.power(X, 2)) + eps
     [a, ] = numpy.nonzero(CumSum > Thres)
     if len(a) > 0:
-        mC = numpy.float64(a[0]) / (float(fftLength))
+        mC = a[0].astype('float64') / (float(fftLength))
     else:
         mC = 0.0
     return (mC)
@@ -150,7 +136,7 @@ def stHarmonic(frame, fs):
         M = len(R) - 1
 
     Gamma = numpy.zeros((M), dtype=numpy.float64)
-    CSum = numpy.cumsum(frame ** 2)
+    CSum = numpy.cumsum(numpy.power(frame, 2))
     Gamma[m0:M] = R[m0:M] / (numpy.sqrt((g * CSum[M:m0:-1])) + eps)
 
     ZCR = stZCR(Gamma)
@@ -204,7 +190,7 @@ def mfccInitFilterBanks(fs, nfft):
     heights = 2./(freqs[2:] - freqs[0:-2])
 
     # Compute filterbank coeff (in fft domain, in bins)
-    fbank = numpy.zeros((nFiltTotal, nfft))
+    fbank = numpy.zeros((nFiltTotal, int(nfft)))
     nfreqs = numpy.arange(nfft) / (1. * nfft) * fs
 
     for i in range(nFiltTotal):
@@ -245,7 +231,7 @@ def stChromaFeaturesInit(nfft, fs):
     """
     This function initializes the chroma matrices used in the calculation of the chroma features
     """
-    freqs = numpy.array([((f + 1) * fs) / (2 * nfft) for f in range(nfft)])    
+    freqs = numpy.array([((f + 1) * fs) / (2 * int(nfft)) for f in range(int(nfft))])
     Cp = 27.50    
     nChroma = numpy.round(12.0 * numpy.log2(freqs / Cp)).astype(int)
 
@@ -278,7 +264,7 @@ def stChromaFeatures(X, fs, nChroma, nFreqsPerChroma):
     newD = int(numpy.ceil(C.shape[0] / 12.0) * 12)
     C2 = numpy.zeros((newD, ))
     C2[0:C.shape[0]] = C
-    C2 = C2.reshape(C2.shape[0]/12, 12)
+    C2 = C2.reshape(int(C2.shape[0] / 12), 12)
     #for i in range(12):
     #    finalC[i] = numpy.sum(C[i:C.shape[0]:12])
     finalC = numpy.matrix(numpy.sum(C2, axis=0)).T
@@ -567,7 +553,7 @@ def stFeatureExtraction(signal, Fs, Win, Step):
         x = signal[curPos:curPos+Win]                    # get current window
         curPos = curPos + Step                           # update window position
         X = abs(fft(x))                                  # get fft magnitude
-        X = X[0:nFFT]                                    # normalize fft
+        X = X[0:int(nFFT)]                                    # normalize fft
         X = X / len(X)
         if countFrames == 1:
             Xprev = X.copy()                             # keep previous fft mag (used in spectral flux)
@@ -731,10 +717,10 @@ def dirWavFeatureExtraction(dirName, mtWin, mtStep, stWin, stStep, computeBEAT=F
 
     wavFilesList = sorted(wavFilesList)    
     wavFilesList2 = []
-    for i, wavFile in enumerate(wavFilesList):        
-        print "Analyzing file {0:d} of {1:d}: {2:s}".format(i+1, len(wavFilesList), wavFile.encode('utf-8'))
+    for i, wavFile in enumerate(wavFilesList):
+        print("Analyzing file {0:d} of {1:d}: {2:s}".format(i + 1, len(wavFilesList), wavFile))
         if os.stat(wavFile).st_size == 0:
-            print "   (EMPTY FILE -- SKIPPING)"
+            print("   (EMPTY FILE -- SKIPPING)")
             continue        
         [Fs, x] = audioBasicIO.readAudioFile(wavFile)            # read file    
         if isinstance(x, int):
@@ -743,7 +729,7 @@ def dirWavFeatureExtraction(dirName, mtWin, mtStep, stWin, stStep, computeBEAT=F
         t1 = time.clock()        
         x = audioBasicIO.stereo2mono(x)                          # convert stereo to mono                
         if x.shape[0]<float(Fs)/10:
-            print "  (AUDIO FILE TOO SMALL - SKIPPING)"
+            print("  (AUDIO FILE TOO SMALL - SKIPPING)")
             continue
         wavFilesList2.append(wavFile)
         if computeBEAT:                                          # mid-term feature extraction for current file
@@ -766,7 +752,7 @@ def dirWavFeatureExtraction(dirName, mtWin, mtStep, stWin, stStep, computeBEAT=F
             duration = float(len(x)) / Fs
             processingTimes.append((t2 - t1) / duration)
     if len(processingTimes) > 0:
-        print "Feature extraction complexity ratio: {0:.1f} x realtime".format((1.0 / numpy.mean(numpy.array(processingTimes))))
+        print("Feature extraction complexity ratio: {0:.1f} x realtime".format((1.0 / numpy.mean(numpy.array(processingTimes)))))
     return (allMtFeatures, wavFilesList2)
 
 
@@ -867,20 +853,20 @@ def mtFeatureExtractionToFile(fileName, midTermSize, midTermStep, shortTermSize,
 
     numpy.save(outPutFile, mtF)                              # save mt features to numpy file
     if PLOT:
-        print "Mid-term numpy file: " + outPutFile + ".npy saved"
+        print("Mid-term numpy file: " + outPutFile + ".npy saved")
     if storeToCSV:
         numpy.savetxt(outPutFile+".csv", mtF.T, delimiter=",")
         if PLOT:
-            print "Mid-term CSV file: " + outPutFile + ".csv saved"
+            print("Mid-term CSV file: " + outPutFile + ".csv saved")
 
     if storeStFeatures:
         numpy.save(outPutFile+"_st", stF)                    # save st features to numpy file
         if PLOT:
-            print "Short-term numpy file: " + outPutFile + "_st.npy saved"
+            print("Short-term numpy file: " + outPutFile + "_st.npy saved")
         if storeToCSV:
             numpy.savetxt(outPutFile+"_st.csv", stF.T, delimiter=",")    # store st features to CSV file
             if PLOT:
-                print "Short-term CSV file: " + outPutFile + "_st.csv saved"
+                print("Short-term CSV file: " + outPutFile + "_st.csv saved")
 
 
 def mtFeatureExtractionToFileDir(dirName, midTermSize, midTermStep, shortTermSize, shortTermStep, storeStFeatures=False, storeToCSV=False, PLOT=False):
